@@ -13,6 +13,12 @@ except ImportError as e:
 
 DEFAULT_SIZE = 500
 
+MIN=0
+MAX=1
+RADIUS_LIMIT=(.2,.72)
+ANGLE_LIMIT=(-90,90)
+HEIGHT_LIMIT=(.3,1.)
+
 class RobotEnv(gym.GoalEnv):
     def __init__(self, model_path, initial_qpos, n_actions, n_substeps):
         if model_path.startswith('/'):
@@ -55,7 +61,9 @@ class RobotEnv(gym.GoalEnv):
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
-
+# TODO
+# 1.clip our simulated system environment to make sure that actions don't leave simulated bounds 
+# 2.in physcial system set action, we need to also multiply actions by a constant coeff -> .05 in simulations 
     def step(self, action):
         action = np.clip(action, self.action_space.low, self.action_space.high)
         self._set_action(action)

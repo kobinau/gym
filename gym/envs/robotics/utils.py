@@ -1,12 +1,13 @@
 import numpy as np
-
+import math
 from gym import error
 try:
     import mujoco_py
 except ImportError as e:
     raise error.DependencyNotInstalled("{}. (HINT: you need to install mujoco_py, and also perform the setup instructions here: https://github.com/openai/mujoco-py/.)".format(e))
-
-
+#constants for central focus
+x_off=.8
+y_off=.75
 def robot_get_obs(sim):
     """Returns all joint positions and velocities associated with
     a robot.
@@ -20,6 +21,7 @@ def robot_get_obs(sim):
     return np.zeros(0), np.zeros(0)
 
 
+ranges = [[.2, .72], [-90, 90], [.324, 1]]
 def ctrl_set_action(sim, action):
     """For torque actuators it copies the action into mujoco ctrl field.
     For position actuators it sets the target relative to the current qpos.
@@ -33,8 +35,10 @@ def ctrl_set_action(sim, action):
             else:
                 idx = sim.model.jnt_qposadr[sim.model.actuator_trnid[i, 0]]
                 sim.data.ctrl[i] = sim.data.qpos[idx] + action[i]
-
-
+def to_cart(r,theta):
+    return r*math.cos(theta*math.pi/180), r*math.sin(theta*math.pi/180)
+def to_polar(x,y):
+    return math.sqrt(x**2+y**2), math.atan(y/x)*180/math.pi
 def mocap_set_action(sim, action):
     """The action controls the robot using mocaps. Specifically, bodies
     on the robot (for example the gripper wrist) is controlled with
@@ -52,10 +56,23 @@ def mocap_set_action(sim, action):
         quat_delta = action[:, 3:]
 
         reset_mocap2body_xpos(sim)
+        #: maybe clip this
+        #print(sim.data.mocap_pos,pos_delta)
         sim.data.mocap_pos[:] = sim.data.mocap_pos + pos_delta
         sim.data.mocap_quat[:] = sim.data.mocap_quat + quat_delta
-
-
+        #print("unclipped",sim.data.mocap_pos)
+        #limitations are in polar coords so first convert
+        r, theta=to_polar(sim.data.mocap_pos[0][0]-x_off,sim.data.mocap_pos[0][1]-y_off)
+        #now clip
+        r=np.clip(r,ranges[0][0],ranges[0][1])
+        theta=np.clip(theta,ranges[1][0], ranges[1][1])
+        sim.data.mocap_pos[0][2]=np.clip(sim.data.mocap_pos[0][2],ranges[2][0],ranges[2][1])
+        #print("rtheta", r, theta)
+        #now convert back with proper offsets
+        x,y=to_cart(r,theta)
+        #print("unoffset",x,y)
+        sim.data.mocap_pos[0][0],sim.data.mocap_pos[0][1]=x+x_off, y+y_off
+        #print("clipped:",sim.data.mocap_pos)
 def reset_mocap_welds(sim):
     """Resets the mocap welds that we use for actuation.
     """

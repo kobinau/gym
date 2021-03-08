@@ -1,7 +1,7 @@
 import numpy as np
-
+import traceback
 from gym.envs.robotics import rotations, robot_env, utils
-
+import math
 
 def goal_distance(goal_a, goal_b):
     assert goal_a.shape == goal_b.shape
@@ -57,21 +57,58 @@ class FetchEnv(robot_env.RobotEnv):
             return -(d > self.distance_threshold).astype(np.float32)
         else:
             return -d
+    # radius .2->.72
+    # theta -90-> 90
+    # z .324-> 1.0
+    def get_obs_wm(self,polar=True):
+        obs=self.get_observation(polar)
+        obs[0]=(obs[0]-.2)*(250-150)/(.72-.2)+150
+        obs[1]=(obs[1]+90)
+        obs[2]=(obs[2]-.324)*(150)/(1.0-.324)
+        return obs
+    def set_obs_wm(self,obs,polar=True):
+        
+        obs[0]=(obs[0]-150)*(.72-.2)/(250-150)+.2
+        obs[1]=obs[1]-90
+        obs[2]=(obs[2])*(1.0-.324)/(150)+.324
+        self.set_observation(obs,polar)
+        
+    def get_observation(self,polar=False):
+        obs=self._get_obs()["achieved_goal"]
+        obs=[obs[0]-utils.x_off,obs[1]-utils.y_off,obs[2]]
+        if polar:
+            return [math.sqrt(obs[0]**2+obs[1]**2),180*math.atan(obs[1]/obs[0])/math.pi,obs[2]]
+        else: 
+            return obs
 
+    def set_observation(self, future_pos, polar=False):
+        if polar:
+            future_pos=[future_pos[0]*math.cos(future_pos[1]*math.pi/180),future_pos[0]*math.sin(future_pos[1]*math.pi/180),future_pos[2]]
+        future_pos=[future_pos[0]+utils.x_off, future_pos[1]+utils.y_off,future_pos[2]]
+        obs=self._get_obs()
+        action=future_pos-obs["achieved_goal"]
+        action=np.append(action,[0])
+        self._set_action_no_limit(action)
+        for _ in range(10):
+            self.sim.step()
+        self._step_callback()
     # RobotEnv methods
     # ----------------------------
 
     def _step_callback(self):
         if self.block_gripper:
+            #print(self.get_observation())
             self.sim.data.set_joint_qpos('robot0:l_gripper_finger_joint', 0.)
-            self.sim.data.set_joint_qpos('robot0:r_gripper_finger_joint', 0.)
-            self.sim.forward()
 
+            self.sim.data.set_joint_qpos('robot0:r_gripper_finger_joint', 0.)
+            #print(self.get_observation())
+            self.sim.forward()
+    def _set_action_no_limit(self,action):
+        self._set_action(action/.05)
     def _set_action(self, action):
         assert action.shape == (4,)
         action = action.copy()  # ensure that we don't change the action outside of this scope
         pos_ctrl, gripper_ctrl = action[:3], action[3]
-
         pos_ctrl *= 0.05  # limit maximum change in position
         rot_ctrl = [1., 0., 1., 0.]  # fixed rotation of the end effector, expressed as a quaternion
         gripper_ctrl = np.array([gripper_ctrl, gripper_ctrl])
@@ -79,7 +116,8 @@ class FetchEnv(robot_env.RobotEnv):
         if self.block_gripper:
             gripper_ctrl = np.zeros_like(gripper_ctrl)
         action = np.concatenate([pos_ctrl, rot_ctrl, gripper_ctrl])
-
+        #print(action)
+        #print(self.get_observation())
         # Apply action to simulation.
         utils.ctrl_set_action(self.sim, action)
         utils.mocap_set_action(self.sim, action)
@@ -138,7 +176,7 @@ class FetchEnv(robot_env.RobotEnv):
 
     def _reset_sim(self):
         self.sim.set_state(self.initial_state)
-
+        #print(self.initial_state)
         # Randomize start position of object.
         if self.has_object:
             object_xpos = self.initial_gripper_xpos[:2]
@@ -161,6 +199,7 @@ class FetchEnv(robot_env.RobotEnv):
                 goal[2] += self.np_random.uniform(0, 0.45)
         else:
             goal = self.initial_gripper_xpos[:3] + self.np_random.uniform(-self.target_range, self.target_range, size=3)
+        goal[2]=.32
         return goal.copy()
 
     def _is_success(self, achieved_goal, desired_goal):
