@@ -1,5 +1,5 @@
 import numpy as np
-
+import traceback
 from gym.envs.robotics import rotations, robot_env, utils
 
 
@@ -57,16 +57,30 @@ class FetchEnv(robot_env.RobotEnv):
             return -(d > self.distance_threshold).astype(np.float32)
         else:
             return -d
+    def get_observation(self):
+        return self._get_obs()
 
+    def set_observation(self, future_pos):
+        obs=self._get_obs()
+        action=future_pos-obs["achieved_goal"]
+        action=np.append(action,[0])
+        self._set_action_no_limit(action)
+        for _ in range(10):
+            self.sim.step()
+        self._step_callback()
     # RobotEnv methods
     # ----------------------------
 
     def _step_callback(self):
         if self.block_gripper:
+            #print(self.get_observation())
             self.sim.data.set_joint_qpos('robot0:l_gripper_finger_joint', 0.)
-            self.sim.data.set_joint_qpos('robot0:r_gripper_finger_joint', 0.)
-            self.sim.forward()
 
+            self.sim.data.set_joint_qpos('robot0:r_gripper_finger_joint', 0.)
+            #print(self.get_observation())
+            self.sim.forward()
+    def _set_action_no_limit(self,action):
+        self._set_action(action/.05)
     def _set_action(self, action):
         assert action.shape == (4,)
         action = action.copy()  # ensure that we don't change the action outside of this scope
@@ -79,7 +93,8 @@ class FetchEnv(robot_env.RobotEnv):
         if self.block_gripper:
             gripper_ctrl = np.zeros_like(gripper_ctrl)
         action = np.concatenate([pos_ctrl, rot_ctrl, gripper_ctrl])
-
+        #print(action)
+        #print(self.get_observation())
         # Apply action to simulation.
         utils.ctrl_set_action(self.sim, action)
         utils.mocap_set_action(self.sim, action)
@@ -138,7 +153,7 @@ class FetchEnv(robot_env.RobotEnv):
 
     def _reset_sim(self):
         self.sim.set_state(self.initial_state)
-
+        print(self.initial_state)
         # Randomize start position of object.
         if self.has_object:
             object_xpos = self.initial_gripper_xpos[:2]
@@ -161,6 +176,7 @@ class FetchEnv(robot_env.RobotEnv):
                 goal[2] += self.np_random.uniform(0, 0.45)
         else:
             goal = self.initial_gripper_xpos[:3] + self.np_random.uniform(-self.target_range, self.target_range, size=3)
+        goal[2]=0
         return goal.copy()
 
     def _is_success(self, achieved_goal, desired_goal):
