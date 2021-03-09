@@ -1,7 +1,7 @@
 import numpy as np
 import traceback
 from gym.envs.robotics import rotations, robot_env, utils
-
+import math
 
 def goal_distance(goal_a, goal_b):
     assert goal_a.shape == goal_b.shape
@@ -57,10 +57,18 @@ class FetchEnv(robot_env.RobotEnv):
             return -(d > self.distance_threshold).astype(np.float32)
         else:
             return -d
-    def get_observation(self):
-        return self._get_obs()
+    def get_observation(self,polar=False):
+        obs=self._get_obs()["achieved_goal"]
+        obs=[obs[0]-.8,obs[1]-.75,obs[2]]
+        if polar:
+            return [math.sqrt(obs[0]**2+obs[1]**2),180*math.atan(obs[1]/obs[0])/math.pi,obs[2]]
+        else: 
+            return obs
 
-    def set_observation(self, future_pos):
+    def set_observation(self, future_pos, polar=False):
+        if polar:
+            future_pos=[future_pos[0]*math.cos(future_pos[1]*math.pi/180),future_pos[0]*math.sin(future_pos[1]*math.pi/180),future_pos[2]]
+        future_pos=[future_pos[0]+.8, future_pos[1]+.75,future_pos[2]]
         obs=self._get_obs()
         action=future_pos-obs["achieved_goal"]
         action=np.append(action,[0])
@@ -176,7 +184,7 @@ class FetchEnv(robot_env.RobotEnv):
                 goal[2] += self.np_random.uniform(0, 0.45)
         else:
             goal = self.initial_gripper_xpos[:3] + self.np_random.uniform(-self.target_range, self.target_range, size=3)
-        goal[2]=0
+        goal[2]=.3
         return goal.copy()
 
     def _is_success(self, achieved_goal, desired_goal):

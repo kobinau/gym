@@ -13,6 +13,12 @@ except ImportError as e:
 
 DEFAULT_SIZE = 500
 
+MIN=0
+MAX=1
+RADIUS_LIMIT=(.2,.72)
+ANGLE_LIMIT=(-90,90)
+HEIGHT_LIMIT=(.3,1.)
+
 class RobotEnv(gym.GoalEnv):
     def __init__(self, model_path, initial_qpos, n_actions, n_substeps):
         if model_path.startswith('/'):
