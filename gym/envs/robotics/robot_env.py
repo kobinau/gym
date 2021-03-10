@@ -65,7 +65,6 @@ class RobotEnv(gym.GoalEnv):
 # 1.clip our simulated system environment to make sure that actions don't leave simulated bounds 
 # 2.in physcial system set action, we need to also multiply actions by a constant coeff -> .05 in simulations 
     def step(self, action):
-        #3. our physical system action also needs to clip with bounds check here
         action = np.clip(action, self.action_space.low, self.action_space.high)
         self._set_action(action)
         self.sim.step()
