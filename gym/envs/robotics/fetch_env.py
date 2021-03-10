@@ -57,6 +57,22 @@ class FetchEnv(robot_env.RobotEnv):
             return -(d > self.distance_threshold).astype(np.float32)
         else:
             return -d
+    # radius .2->.72
+    # theta -90-> 90
+    # z .324-> 1.0
+    def get_obs_wm(self,polar=True):
+        obs=self.get_observation(polar)
+        obs[0]=(obs[0]-.2)*(250-150)/(.72-.2)+150
+        obs[1]=(obs[1]+90)
+        obs[2]=(obs[2]-.324)*(150)/(1.0-.324)
+        return obs
+    def set_obs_wm(self,obs,polar=True):
+        
+        obs[0]=(obs[0]-150)*(.72-.2)/(250-150)+.2
+        obs[1]=obs[1]-90
+        obs[2]=(obs[2])*(1.0-.324)/(150)+.324
+        self.set_observation(obs,polar)
+        
     def get_observation(self,polar=False):
         obs=self._get_obs()["achieved_goal"]
         obs=[obs[0]-.8,obs[1]-.75,obs[2]]
@@ -93,7 +109,7 @@ class FetchEnv(robot_env.RobotEnv):
         assert action.shape == (4,)
         action = action.copy()  # ensure that we don't change the action outside of this scope
         pos_ctrl, gripper_ctrl = action[:3], action[3]
-
+        #TODO needs to match with physical system (keep in mind mapping differences)  
         pos_ctrl *= 0.05  # limit maximum change in position
         rot_ctrl = [1., 0., 1., 0.]  # fixed rotation of the end effector, expressed as a quaternion
         gripper_ctrl = np.array([gripper_ctrl, gripper_ctrl])
