@@ -199,7 +199,13 @@ class FetchEnv(robot_env.RobotEnv):
                 goal[2] += self.np_random.uniform(0, 0.45)
         else:
             goal = self.initial_gripper_xpos[:3] + self.np_random.uniform(-self.target_range, self.target_range, size=3)
+        r=self.np_random.uniform(.2,.72)
+        theta=self.np_random.uniform(-90,90)
+        print(goal, r , theta)
+        goal[0]=r*math.cos(theta*math.pi/180)+.8
+        goal[1]=r*math.sin(theta*math.pi/180)+.75
         goal[2]=.32
+        print(goal)
         return goal.copy()
 
     def _is_success(self, achieved_goal, desired_goal):
